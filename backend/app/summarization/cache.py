@@ -75,6 +75,23 @@ class SummaryRepository:
             session.rollback()
             raise StorageError(f"failed to store summary for {key.patient_id}: {exc}") from exc
 
+    def list_for_bundle(self, patient_id: str, record_hash: str) -> list[SummaryCacheRow]:
+        """Return all cached summaries for a patient's current Bundle hash.
+
+        Used by the search indexer to include whatever summaries exist for the
+        current Bundle, across models and prompt versions.
+        """
+        return list(
+            self._session.scalars(
+                select(SummaryCacheRow)
+                .where(
+                    SummaryCacheRow.patient_id == patient_id,
+                    SummaryCacheRow.record_hash == record_hash,
+                )
+                .order_by(SummaryCacheRow.model_name, SummaryCacheRow.prompt_version)
+            ).all()
+        )
+
     def count(self) -> int:
         """Return the number of cached summaries."""
         result = self._session.scalar(select(func.count()).select_from(SummaryCacheRow))

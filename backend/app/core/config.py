@@ -27,6 +27,8 @@ class Settings(BaseSettings):
     anthropic_model: str = Field(default="claude-sonnet-5")
     database_url: str = Field(default="sqlite:///./data/ehr.sqlite3")
     chroma_path: str = Field(default="./data/chroma")
+    chroma_collection: str = Field(default="ehr_media")
+    embedding_model: str = Field(default="all-MiniLM-L6-v2")
     cors_origins: str = Field(default="http://localhost:5173")
 
     @property

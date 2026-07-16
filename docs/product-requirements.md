@@ -82,13 +82,21 @@ model / prompt version, and deterministic quality checks. The API key and model
 are configured via `ANTHROPIC_API_KEY` and `ANTHROPIC_MODEL`; cached summaries
 are readable without a key. Summaries are assistive and require human review.
 
-### 6. Embeddings and semantic search — planned
+### 6. Embeddings and semantic search — implemented
 
 - Embed FHIR document text and generated summaries using
   sentence-transformers.
 - Store embeddings in a persistent ChromaDB collection.
 - Expose semantic search over documents and summaries via a FastAPI
   `POST /search` endpoint.
+
+Delivered as an idempotent indexing CLI (deterministic Chroma IDs, stale-entry
+replacement on Bundle change) and a `POST /search` endpoint with resource-type
+and date filtering. Search returns the top five clinical resources; cached
+summaries contribute a small patient-level relevance boost and are indexed only
+when available. The embedding model (`EMBEDDING_MODEL`, default
+`all-MiniLM-L6-v2`) and Chroma collection (`CHROMA_COLLECTION`, `CHROMA_PATH`)
+are configurable and loaded lazily, reused across requests.
 
 ### 7. Clinician-facing interface — planned
 

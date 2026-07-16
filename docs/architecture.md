@@ -382,6 +382,47 @@ and the Anthropic SDK; it never re-runs ingestion or FHIR mapping.
   in a `SummarizationReport`. The `cli.py` entry point wires this over stored
   patients and returns a nonzero exit code when any summary fails.
 
+## Semantic search architecture
+
+The `search` package embeds clinical text and cached summaries and serves
+semantic search over them. It depends on the persistence and summarization-cache
+layers plus sentence-transformers and ChromaDB. Nothing loads the embedding
+model or opens Chroma at import time.
+
+- **Embeddings** (`embeddings.py`) — an `Embedder` protocol so tests inject a
+  deterministic, network-free fake. `SentenceTransformerEmbedder` loads a
+  `SentenceTransformer` (default `all-MiniLM-L6-v2`, via `EMBEDDING_MODEL`) lazily
+  once and reuses it, returning L2-normalized vectors for cosine similarity.
+- **Index documents** (`documents.py`) — turns a Bundle into one readable-text
+  document per DocumentReference/DiagnosticReport (reusing the summarization
+  evidence extractor to decode attachments) and one document per available
+  cached summary. Deterministic IDs (`resource:<uuid>`, `summary:<patient>:<hash>:<model>:<prompt>`)
+  and a content hash over text+metadata drive idempotency. Resource metadata
+  carries patient ID/name, MRN, resource ID/type, title, Bundle hash, and record
+  date (omitted when absent, since Chroma rejects null metadata).
+- **Index store** (`index_store.py`) — wraps a cosine Chroma collection.
+  `reconcile_patient` diffs desired vs. existing documents by content hash:
+  unchanged documents are neither re-embedded nor rewritten, changed/new ones are
+  embedded and upserted, and documents no longer present for that patient are
+  deleted (stale-entry replacement when a Bundle changes). `open_persistent_index`
+  creates the persistent client; tests pass an ephemeral collection instead.
+- **Indexer** (`indexer.py`) — reconciles every valid stored Bundle and its
+  available summaries, tallying inserted/updated/unchanged/removed counts. It
+  never re-runs ingestion, FHIR mapping, or summarization.
+- **Search service** (`service.py`) — validates the query and filters, embeds
+  the query once, queries resource and summary documents, applies resource-type
+  and date filters (undated resources excluded when a date filter is set), scores,
+  and returns the top five. Scoring: base `1 - cosine_distance / 2`, plus a small
+  per-patient summary boost (`base + 0.1 * best_summary_score`); the result is
+  always the clinical resource. Ordering is descending score then ascending
+  resource ID (stable tie-break).
+- **API** (`app/api/search.py`) — `POST /search` with a JSON body (`query`) and
+  optional `resource_type`/`date_from`/`date_to` query parameters. The engine is
+  provided by dependency injection, built lazily and cached (`lru_cache`), so
+  tests override it with a fake and nothing loads at import time. Validation
+  errors map to `422`, an unavailable index to `503`; no stack traces or
+  filesystem paths are exposed. `/health` is unchanged.
+
 ## Testing strategy
 
 - **Framework**: pytest for the backend; FastAPI's `TestClient` (HTTPX) for

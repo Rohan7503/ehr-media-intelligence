@@ -1,0 +1,56 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ehr-media-intelligence-backend"
+version = "0.1.0"
+description = "Backend API for the EHR Media Intelligence Platform"
+requires-python = ">=3.11,<3.12"
+dependencies = [
+    "fastapi==0.139.1",
+    "uvicorn[standard]==0.51.0",
+    "pydantic==2.13.4",
+    "pydantic-settings==2.14.2",
+    "fhir.resources==8.3.0",
+    "sentence-transformers==5.6.0",
+    "chromadb==1.5.9",
+    "sqlalchemy==2.0.51",
+    "anthropic==0.116.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==9.1.1",
+    "httpx2==2.7.0",
+    "ruff==0.15.21",
+    "mypy==2.3.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "SIM", # flake8-simplify
+]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+plugins = ["pydantic.mypy"]
+files = ["app", "tests"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

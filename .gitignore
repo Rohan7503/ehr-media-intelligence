@@ -1,0 +1,65 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+.python-version
+
+# --- Tooling caches ---
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.tox/
+
+# --- Coverage ---
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# --- Node / frontend ---
+node_modules/
+frontend/dist/
+frontend/coverage/
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# --- Environment files ---
+.env
+.env.*
+!.env.example
+
+# --- SQLite databases ---
+*.sqlite
+*.sqlite3
+*.db
+
+# --- ChromaDB persistence ---
+chroma/
+.chroma/
+chroma_data/
+
+# --- Downloaded model caches ---
+.cache/
+models/
+sentence_transformers_cache/
+huggingface/
+
+# --- Editors ---
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# --- Operating system ---
+.DS_Store
+Thumbs.db
+Desktop.ini

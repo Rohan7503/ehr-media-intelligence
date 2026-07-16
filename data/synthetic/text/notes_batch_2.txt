@@ -1,0 +1,127 @@
+PATIENT_ID: SRC-008
+MRN: 4470
+NAME: Jonas Lindqvist
+DOB: 31/31/1979
+GENDER: U
+RECORD_ID: tr-0800
+RECORD_TYPE: clinical note
+RECORD_DATE: 10/08/2024
+TITLE: Primary care follow-up
+TEXT: Patient seen for routine follow-up of chronic sinusitis.
+Reports adherence to the current care plan.
+Plan: continue current management and recheck in three months.
+
+PATIENT_ID: SRC-008
+MRN: 4470
+NAME: Jonas Lindqvist
+DOB: 04/22/1979
+GENDER: unknown
+RECORD_ID: tr-0801
+ENCOUNTER_ID: ENC-0801
+RECORD_TYPE: lab
+RECORD_DATE: 21-10-2024
+DIAGNOSTIC_CODE: CMP
+TITLE: Comprehensive metabolic panel
+TEXT: Comprehensive metabolic panel collected at the morning draw.
+Indication: monitoring for chronic sinusitis.
+All analytes within the laboratory reference intervals.
+
+PATIENT_ID: SRC-008
+MRN: 4470
+NAME: Jonas Lindqvist
+DOB: 22-04-1979
+GENDER: U
+RECORD_ID: tr-0802
+RECORD_TYPE: progress note
+RECORD_DATE: 2024-11-03T09:30:00
+TITLE: Specialist consultation
+TEXT: Consultation requested for ongoing chronic sinusitis.
+History reviewed with the patient in clinic today.
+Impression discussed; follow-up arranged with the referring provider.
+
+PATIENT_ID: SRC-008
+MRN: 4470
+NAME: Jonas Lindqvist
+DOB: 1979-04-22
+GENDER: unknown
+RECORD_ID: tr-0803
+ENCOUNTER_ID: ENC-0803
+RECORD_TYPE: imaging
+RECORD_DATE: 2024-11-16
+DIAGNOSTIC_CODE: XR-CHEST
+TITLE: Chest X-ray report
+TEXT: Two-view chest radiograph obtained.
+Indication: baseline imaging in the context of chronic sinusitis.
+No acute cardiopulmonary findings.
+
+PATIENT_ID: SRC-008
+MRN: 4470
+NAME: Jonas Lindqvist
+DOB: 04/22/1979
+GENDER: U
+RECORD_ID: tr-0804
+RECORD_TYPE: clinical note
+RECORD_DATE: 11/29/2024
+TITLE: Medication review
+TEXT: Medication list reconciled during today's visit.
+No adverse effects reported for current chronic sinusitis therapy.
+Refills issued for ninety days.
+
+PATIENT_ID: SRC-008
+MRN: 4470
+NAME: Jonas Lindqvist
+DOB: 22-04-1979
+GENDER: unknown
+RECORD_ID: tr-0805
+ENCOUNTER_ID: ENC-0805
+RECORD_TYPE: lab
+RECORD_DATE: 12-12-2024
+DIAGNOSTIC_CODE: LIPID
+TITLE: Lipid panel
+TEXT: Fasting lipid panel processed.
+Indication: cardiovascular risk assessment alongside chronic sinusitis.
+Values compared against the prior result on file.
+
+PATIENT_ID: SRC-008
+MRN: 4470
+NAME: Jonas Lindqvist
+DOB: 1979-04-22
+GENDER: U
+RECORD_ID: tr-0806
+RECORD_TYPE: progress note
+RECORD_DATE: 2024-12-25T09:30:00
+TITLE: Telehealth check-in
+TEXT: Brief telehealth visit completed for chronic sinusitis monitoring.
+Patient had no new concerns during the call.
+Next in-person visit confirmed.
+
+PATIENT_ID: SRC-007
+MRN: 3310
+NAME: Priya Ramanathan
+GENDER: F
+RECORD_ID: tr-0700
+RECORD_TYPE: document
+RECORD_DATE: 09-07-2024
+TEXT: Patient seen for routine follow-up of hypothyroidism.
+Reports adherence to the current care plan.
+Plan: continue current management and recheck in three months.
+
+PATIENT_ID: SRC-061
+MRN: 888
+NAME: Elio Brandt
+DOB: 1966-03-14
+GENDER: M
+RECORD_ID: tr-c2b0
+RECORD_TYPE: note
+RECORD_DATE: 2024-07-02
+TITLE: Annual wellness visit
+TEXT: Annual wellness visit completed.
+Preventive screenings reviewed and up to date.
+
+NAME: Casey Whitlock
+GENDER: F
+RECORD_ID: tr-r100
+RECORD_TYPE: note
+RECORD_DATE: 2024-08-10
+TITLE: Walk-in visit
+TEXT: Walk-in visit note received without a usable patient identifier.

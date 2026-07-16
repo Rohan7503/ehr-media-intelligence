@@ -37,6 +37,10 @@ yarn-error.log*
 .env.*
 !.env.example
 
+# --- Pipeline runtime output ---
+data/generated/
+ingestion-output/
+
 # --- SQLite databases ---
 *.sqlite
 *.sqlite3

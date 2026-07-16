@@ -1,0 +1,101 @@
+PATIENT_ID: SRC-007
+MRN: 3310
+NAME: Priya Ramanathan
+GENDER: F
+RECORD_ID: tr-0700
+RECORD_TYPE: document
+RECORD_DATE: 09-07-2024
+TEXT: Patient seen for routine follow-up of hypothyroidism.
+Reports adherence to the current care plan.
+Plan: continue current management and recheck in three months.
+
+PATIENT_ID: SRC-007
+MRN: 33-10
+NAME: Priya Ramanathan
+GENDER: F
+RECORD_ID: tr-0701
+ENCOUNTER_ID: ENC-0701
+RECORD_TYPE: lab report
+RECORD_DATE: 2024-07-22T09:30:00
+DIAGNOSTIC_CODE: CMP
+TITLE: Comprehensive metabolic panel
+TEXT: Comprehensive metabolic panel collected at the morning draw.
+Indication: monitoring for hypothyroidism.
+All analytes within the laboratory reference intervals.
+
+PATIENT_ID: SRC-007
+MRN: 3310
+NAME: Priya Ramanathan
+GENDER: F
+RECORD_ID: tr-0702
+RECORD_TYPE: note
+RECORD_DATE: 2024-08-04
+TITLE: Specialist consultation
+TEXT: Consultation requested for ongoing hypothyroidism.
+History reviewed with the patient in clinic today.
+Impression discussed; follow-up arranged with the referring provider.
+
+PATIENT_ID: SRC-007
+MRN: 33-10
+NAME: Priya Ramanathan
+GENDER: F
+RECORD_ID: tr-0703
+ENCOUNTER_ID: ENC-0703
+RECORD_TYPE: diagnostic_report
+RECORD_DATE: 08/17/2024
+DIAGNOSTIC_CODE: XR-CHEST
+TITLE: Chest X-ray report
+TEXT: Two-view chest radiograph obtained.
+Indication: baseline imaging in the context of hypothyroidism.
+No acute cardiopulmonary findings.
+
+PATIENT_ID: SRC-007
+MRN: 3310
+NAME: Priya Ramanathan
+GENDER: F
+RECORD_ID: tr-0704
+RECORD_TYPE: document
+RECORD_DATE: 30-08-2024
+TITLE: Medication review
+TEXT: Medication list reconciled during today's visit.
+No adverse effects reported for current hypothyroidism therapy.
+Refills issued for ninety days.
+
+PATIENT_ID: SRC-007
+MRN: 33-10
+NAME: Priya Ramanathan
+GENDER: F
+RECORD_ID: tr-0705
+ENCOUNTER_ID: ENC-0705
+RECORD_TYPE: lab report
+RECORD_DATE: 2024-09-12T09:30:00
+DIAGNOSTIC_CODE: LIPID
+TITLE: Lipid panel
+TEXT: Fasting lipid panel processed.
+Indication: cardiovascular risk assessment alongside hypothyroidism.
+Values compared against the prior result on file.
+
+PATIENT_ID: SRC-007
+MRN: 3310
+NAME: Priya Ramanathan
+GENDER: F
+RECORD_ID: tr-0706
+RECORD_TYPE: note
+RECORD_DATE: 2024-09-25
+TITLE: Telehealth check-in
+TEXT: Brief telehealth visit completed for hypothyroidism monitoring.
+Patient had no new concerns during the call.
+Next in-person visit confirmed.
+
+PATIENT_ID: SRC-001
+MRN: MRN-000123
+NAME: Avery Kestrel
+DOB: 1984-03-02
+GENDER: F
+RECORD_ID: JR-0100
+RECORD_TYPE: note
+RECORD_DATE: 01/10/2023
+TITLE:  Primary care   follow-up 
+TEXT: Patient seen for routine follow-up of hypertension.
+Reports adherence to the current care plan.
+Plan: continue current management and recheck in three months.

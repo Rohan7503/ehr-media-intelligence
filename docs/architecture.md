@@ -96,10 +96,111 @@ The backend package (`backend/app/`) will grow into these modules:
 | `summarization` | Anthropic API client wrapper and summary cache              |
 | `search`        | embedding generation and ChromaDB search                    |
 
-Only `api` and `core` exist in the current scaffold; the rest are created when
-their features are implemented. External services (Anthropic client, ChromaDB
-client, embedding model, database sessions) are always injected as
+`api`, `core`, `domain`, and `ingestion` exist today; the rest are created
+when their features are implemented. External services (Anthropic client,
+ChromaDB client, embedding model, database sessions) are always injected as
 dependencies so tests can substitute fakes.
+
+## Ingestion architecture
+
+### Canonical model boundaries
+
+The `domain` package holds the canonical intermediate representation, fully
+independent of both source formats and FHIR:
+
+- `Patient` — canonical ID (derived from the normalized MRN), source patient
+  IDs, MRN, names, birth date, canonical gender, audit trail.
+- `ClinicalRecord` — canonical ID, source provenance (file, format, source
+  record ID), canonical patient reference, record type, title, text, record
+  date, optional encounter ID and diagnostic code, content fingerprint, audit
+  trail.
+- `AuditEntry` — field, rule identifier, original value, normalized value,
+  human-readable reason. Entries carry no timestamps so canonical output is
+  byte-identical across identical runs.
+
+`RecordType.DOCUMENT` and `RecordType.DIAGNOSTIC_REPORT` anticipate the later
+FHIR mapping to DocumentReference and DiagnosticReport; no FHIR resources are
+created during ingestion.
+
+### Loader architecture
+
+One loader function per format (`ingestion/loaders/`), each producing
+format-independent `RawRecord` objects (a dict of raw string fields plus
+structural issues). All alternate column/key names resolve through a single
+explicit alias table in `loaders/base.py` — no scattered conditionals.
+
+- **JSON**: a top-level array, or an object with a `records` array. Anything
+  else is a file-level error; non-object entries and nested values are
+  record-level issues.
+- **CSV**: standard-library parser; header names map through the alias table;
+  files with no recognized columns fail at file level.
+- **Text**: blank-line-separated records of `KEY: value` headers with a
+  multiline `TEXT:` body (format and limitations documented in
+  `loaders/text_loader.py`). A blank line always ends a record, so note text
+  cannot contain blank lines.
+
+File-level parse failures are reported per file and never abort the run.
+
+### Normalization flow
+
+For each raw record, in order: null-marker cleanup → structural rejection
+checks (loader issues, missing/invalid MRN, no meaningful clinical text,
+unrecognized record type) → demographic normalization (names, birth date,
+gender) → record normalization (dates, title, record ID) → fingerprint →
+duplicate check → identity resolution → acceptance.
+
+Key rules (all in `ingestion/normalizers.py`, all deterministic):
+
+- **Dates**: `YYYY-MM-DD`, `MM/DD/YYYY` (slash values follow the US
+  convention), `DD-MM-YYYY`, and ISO 8601 date-times. Two-digit years and
+  impossible dates are never guessed: invalid optional dates are flagged in
+  the audit trail and stored as `None`.
+- **Gender**: mapped onto the FHIR-aligned enum `male | female | other |
+  unknown`; `X`/nonbinary variants map to `other`; missing or unrecognized
+  values become `unknown` with an audit entry. Never inferred.
+- **MRN**: trim → uppercase → strip separators → drop existing `MRN` prefix →
+  zero-pad numeric IDs to six digits → prefix `MRN-`. Empty results reject
+  the record.
+- **Text**: line endings and trailing whitespace normalized; meaningful line
+  breaks preserved; clinical meaning never altered.
+- **Missing fields**: optional demographics stay `None` with an audit entry;
+  a missing source record ID yields a deterministic derived ID
+  (`REC-<fingerprint prefix>`); a missing title is derived from the first
+  text line. Values are never invented.
+
+### Deduplication strategy
+
+Each record gets a SHA-256 fingerprint over its normalized
+content-identifying fields (MRN, record type, date part, collapsed title,
+normalized text, encounter ID, diagnostic code). Formatting-only differences
+— date style, whitespace, MRN styling, line endings — cannot change the
+fingerprint. The first occurrence in deterministic processing order is
+canonical; later occurrences are excluded and reported with a reference to
+the canonical record.
+
+### Conservative patient-identity policy
+
+Implemented in `ingestion/identity.py`, isolated from the rest of the
+pipeline:
+
+- Records associate to a patient **only** through the exact normalized MRN.
+- Records without a usable MRN are rejected, not guessed.
+- A source patient ID seen with two different MRNs is a quarantined conflict.
+- An MRN seen with a different birth date or family name is a quarantined
+  conflict.
+- Similar or identical names never merge identities.
+- Compatible later records may backfill missing demographics (`None` →
+  value), always audited. Differing given names and genders never overwrite
+  the first observed value.
+
+### Feeding FHIR mapping later
+
+The canonical `Patient` and `ClinicalRecord` models are the sole input to the
+future `fhir` module: `Patient` → FHIR Patient, `ClinicalRecord` →
+DocumentReference or DiagnosticReport (by record type) plus Encounter
+references, bundled per patient. Because ingestion already produces clean,
+deduplicated, identity-resolved models, FHIR mapping stays a pure
+transformation with no cleaning logic of its own.
 
 ## FHIR R4/R4B compatibility decision
 

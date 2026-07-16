@@ -21,23 +21,35 @@ demonstration system and is not intended for clinical use.
 
 ## Functional requirements
 
-### 1. Ingestion
+### 1. Ingestion — implemented
 
 - Ingest synthetic EHR records supplied as JSON, CSV, and plain text.
 - Tolerate messy input: inconsistent field names, mixed date formats, missing
   values, and free-text noise.
 
-### 2. Cleaning and normalization
+Delivered as a deterministic command-line pipeline
+(`python -m app.ingestion.cli`) with structured reports for accepted,
+duplicate, rejected, and identity-conflicting records.
+
+### 2. Cleaning and normalization — implemented
 
 - Clean and normalize ingested records into strict Pydantic v2 domain models.
 - Validation failures must be captured and reported, not silently discarded.
 
-### 3. Audit logging
+Includes explicit rules for dates, gender, MRNs, names, and clinical text,
+plus exact-duplicate detection and a conservative patient-identity policy
+(see `architecture.md`).
+
+### 3. Audit logging — implemented
 
 - Record a per-record audit log covering ingestion outcome, applied
   transformations, and validation issues.
 
-### 4. FHIR mapping
+Every normalization decision is recorded as a structured audit entry on the
+affected patient or record; the ingestion report contains per-record
+outcomes.
+
+### 4. FHIR mapping — planned
 
 - Map normalized records to FHIR-compatible resources:
   - `Patient`
@@ -48,7 +60,7 @@ demonstration system and is not intended for clinical use.
 - Restrict usage to fields shared with FHIR R4 4.0.1 (see
   `architecture.md` for the R4/R4B compatibility decision).
 
-### 5. Clinical summarization
+### 5. Clinical summarization — planned
 
 - Generate clinical summaries of FHIR document content through the Anthropic
   API.
@@ -56,7 +68,7 @@ demonstration system and is not intended for clinical use.
 - Summaries are assistive only and must be presented with a clinical
   disclaimer.
 
-### 6. Embeddings and semantic search
+### 6. Embeddings and semantic search — planned
 
 - Embed FHIR document text and generated summaries using
   sentence-transformers.
@@ -64,7 +76,7 @@ demonstration system and is not intended for clinical use.
 - Expose semantic search over documents and summaries via a FastAPI
   `POST /search` endpoint.
 
-### 7. Clinician-facing interface
+### 7. Clinician-facing interface — planned
 
 - Provide a React + Tailwind CSS web interface for clinicians to search and
   review documents and summaries.

@@ -331,14 +331,56 @@ by itself, exact official R4 conformance validation. The project does not
 claim the official HL7 FHIR Validator was run; exported Bundles can be checked
 against it optionally (see `README.md`).
 
-### FHIR handoff to future summarization and search phases
+### FHIR handoff to summarization and future search phases
 
-The stored Bundles and the canonical `ClinicalRecord` text are the inputs to
-the planned summarization and search phases: summaries will be generated from
-resource text and cached in SQLite, and document text plus summaries will be
-embedded into ChromaDB. Deterministic resource IDs and Bundle hashes give
-those phases stable keys to attach summaries and embeddings to, and to detect
-when a Bundle has changed and its derived artifacts must be recomputed.
+The stored Bundles and their hashes are the inputs to the summarization phase
+(implemented) and the planned search phase. Summaries are generated from
+resource text and cached in SQLite; document text plus summaries will later be
+embedded into ChromaDB. Deterministic resource IDs and Bundle hashes give those
+phases stable keys to attach derived artifacts to, and to detect when a Bundle
+has changed and its artifacts must be recomputed.
+
+## Clinical summarization architecture
+
+The `summarization` package turns stored valid Bundles into concise, structured
+clinical summaries, cached in SQLite. It depends only on the persistence layer
+and the Anthropic SDK; it never re-runs ingestion or FHIR mapping.
+
+- **Evidence extraction** (`evidence.py`) — deterministically distils a stored
+  Bundle JSON into a compact `PatientEvidence` payload (decoded attachment and
+  conclusion text, titles/codes, dates, resource IDs) in Bundle order. The full
+  serialized Bundle and raw base64 payloads are never sent to the provider.
+- **Prompt** (`prompt.py`) — a versioned prompt (`clinical-summary-v1`) plus the
+  forced-tool JSON schema, isolated for review. Bumping `PROMPT_VERSION`
+  invalidates cache reuse for older prompts.
+- **Provider** (`provider.py`) — a `SummaryProvider` protocol so tests inject a
+  fake with no network or key. The production `AnthropicSummaryProvider` uses
+  the installed SDK's forced tool call for structured JSON, with conservative
+  settings (temperature 0, bounded `max_tokens`), a lazily created client (so
+  cache hits need no key), and at most one retry for a transient
+  connection/timeout error. Auth, rate-limit, service, and malformed-response
+  failures become typed application errors; the key and full prompt are never
+  logged.
+- **Summary model** (`summary.py`) — the model returns a `SummaryDraft` (content
+  only); the application assembles the final `ClinicalSummary`, injecting the
+  fixed disclaimer and computing the rendered word count. The 200-word limit and
+  the disclaimer are enforced in code, never trusted to the model.
+- **Quality** (`quality.py`) — deterministic checks (required sections present,
+  under the word limit, exact disclaimer, valid confidence, all cited resource
+  IDs present in this patient's Bundle) returning a structured `QualityResult`.
+  These support the write-up but are not a substitute for clinician review.
+- **Cache** (`cache_models.py`, `cache.py`) — a `summary_cache` table on the
+  shared declarative `Base`, keyed uniquely on
+  `(patient_id, record_hash, model_name, prompt_version)` with a surrogate
+  primary key so historical entries coexist. `record_hash` is the stored Bundle
+  hash. Reads never touch the provider; writes are transactional and roll back
+  on failure. Importing the model registers the table so `init_db` creates it.
+- **Service** (`service.py`) — for each patient: load the valid Bundle, check the
+  cache (early return on hit), else extract → prompt → provider → validate draft
+  → assemble summary → enforce word limit → quality-check → cache only valid
+  summaries. One patient's failure never stops the others; outcomes are tallied
+  in a `SummarizationReport`. The `cli.py` entry point wires this over stored
+  patients and returns a nonzero exit code when any summary fails.
 
 ## Testing strategy
 

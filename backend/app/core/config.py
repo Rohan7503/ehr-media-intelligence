@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     environment: str = Field(default="development")
 
     anthropic_api_key: str = Field(default="")
+    anthropic_model: str = Field(default="claude-sonnet-5")
     database_url: str = Field(default="sqlite:///./data/ehr.sqlite3")
     chroma_path: str = Field(default="./data/chroma")
     cors_origins: str = Field(default="http://localhost:5173")

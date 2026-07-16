@@ -66,13 +66,21 @@ R4 compatibility guard) and SQLite persistence of Bundles and validation
 reports. The scoped guard is not a substitute for the official HL7 FHIR
 Validator, and official R4 conformance validation is not claimed as tested.
 
-### 5. Clinical summarization — planned
+### 5. Clinical summarization — implemented
 
 - Generate clinical summaries of FHIR document content through the Anthropic
   API.
 - Cache summaries so repeated requests do not re-invoke the API.
 - Summaries are assistive only and must be presented with a clinical
   disclaimer.
+
+Delivered as a cache-aware CLI over stored valid Bundles: deterministic
+evidence extraction, a versioned safety prompt, structured-output validation
+against a fixed Pydantic schema, an application-controlled disclaimer and hard
+200-word limit enforced in code, a SQLite cache keyed on the Bundle hash /
+model / prompt version, and deterministic quality checks. The API key and model
+are configured via `ANTHROPIC_API_KEY` and `ANTHROPIC_MODEL`; cached summaries
+are readable without a key. Summaries are assistive and require human review.
 
 ### 6. Embeddings and semantic search — planned
 

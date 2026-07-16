@@ -49,7 +49,7 @@ Every normalization decision is recorded as a structured audit entry on the
 affected patient or record; the ingestion report contains per-record
 outcomes.
 
-### 4. FHIR mapping — planned
+### 4. FHIR mapping — implemented
 
 - Map normalized records to FHIR-compatible resources:
   - `Patient`
@@ -59,6 +59,12 @@ outcomes.
   - `Bundle`
 - Restrict usage to fields shared with FHIR R4 4.0.1 (see
   `architecture.md` for the R4/R4B compatibility decision).
+
+Delivered as deterministic, idempotent mapping of one Bundle per patient, with
+three validation layers (`fhir.resources`, reference integrity, and a scoped
+R4 compatibility guard) and SQLite persistence of Bundles and validation
+reports. The scoped guard is not a substitute for the official HL7 FHIR
+Validator, and official R4 conformance validation is not claimed as tested.
 
 ### 5. Clinical summarization — planned
 

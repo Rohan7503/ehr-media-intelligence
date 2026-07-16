@@ -193,14 +193,109 @@ pipeline:
   value), always audited. Differing given names and genders never overwrite
   the first observed value.
 
-### Feeding FHIR mapping later
+### Feeding FHIR mapping
 
 The canonical `Patient` and `ClinicalRecord` models are the sole input to the
-future `fhir` module: `Patient` → FHIR Patient, `ClinicalRecord` →
-DocumentReference or DiagnosticReport (by record type) plus Encounter
-references, bundled per patient. Because ingestion already produces clean,
-deduplicated, identity-resolved models, FHIR mapping stays a pure
-transformation with no cleaning logic of its own.
+`fhir` module: `Patient` → FHIR Patient, `ClinicalRecord` → DocumentReference
+or DiagnosticReport (by record type) plus Encounter references, bundled per
+patient. Because ingestion already produces clean, deduplicated,
+identity-resolved models, FHIR mapping is a pure transformation with no
+cleaning logic of its own.
+
+## FHIR mapping and persistence architecture
+
+### Mapper boundaries
+
+All `fhir.resources.R4B` imports live under `backend/app/fhir/`; no other
+package imports the FHIR model library. The mapper
+(`app.fhir.mapper`) is pure and read-only: it consumes canonical `Patient` and
+`ClinicalRecord` models and returns `fhir.resources.R4B` resources without
+mutating its inputs. Coded defaults and identifier systems are centralized in
+`app.fhir.constants`.
+
+### Deterministic ID strategy
+
+Every resource ID is a UUIDv5 (`app.fhir.identifiers`) derived from a fixed
+project namespace UUID and a canonical name string of the resource type plus
+the relevant canonical IDs (patient, and encounter or record where
+applicable). Consequences:
+
+- Same canonical input → same IDs, references, and `fullUrl`s across runs.
+- Document and diagnostic mappings include the resource-type name in the
+  derivation, so they never collide.
+- A UUID string satisfies the FHIR `id` restriction `[A-Za-z0-9-.]{1,64}`.
+- No `UUIDv4`/random IDs and no timestamps enter Bundle content, so serialized
+  Bundles are byte-identical across runs.
+
+### Bundle layout and ordering
+
+One `collection` Bundle per patient. Entry order is deterministic: the Patient
+first, then Encounters in resource-ID order, then clinical resources sorted by
+`(dated-first, date, record type, record ID)`. Undated records are still
+included, sorted after dated ones. Each entry's `fullUrl` is the
+`urn:uuid:<id>` form of its resource ID.
+
+### Subject and encounter reference design
+
+References are literal `urn:uuid:<id>` strings that exactly match the target
+entry's `fullUrl` (built by `app.fhir.references` so mapper and validator
+agree on the exact form). Clinical resources reference the Bundle Patient as
+`subject`; DiagnosticReport uses `encounter`, and DocumentReference uses
+`context.encounter`. Encounter periods are derived from associated record
+dates (earliest start, latest end) or omitted when no date exists.
+
+### Validation layers
+
+`app.fhir.validator` runs three independent layers and returns a structured
+`PatientBundleValidation` (`app.fhir.report`):
+
+1. **`fhir.resources`** — re-parses the serialized Bundle through the library
+   models; any `ValidationError` becomes structured issues rather than a raw
+   traceback.
+2. **Reference integrity** — a Pydantic-independent validator covering the
+   13 Bundle invariants (single Patient; present, unique resource IDs; unique
+   `fullUrl`s; resolvable subject/encounter references; complete and exclusive
+   coverage of the expected canonical records; matching resource types; valid
+   base64/UTF-8 attachment payloads; deterministic block ordering). Broken
+   references are reported, never repaired.
+3. **R4 compatibility guard** (`app.fhir.compatibility`) — see below.
+
+A Bundle is valid only when it has no `error`-severity issues. Warnings and
+information remain visible but do not mark a Bundle invalid.
+
+### SQLite schema and repository boundaries
+
+Two SQLAlchemy 2 typed declarative tables (`app.persistence.models`), kept
+separate from domain/FHIR models:
+
+- `fhir_bundle` — `patient_id` (PK), `bundle_id` (unique), `bundle_hash`,
+  `bundle_json` (canonical JSON text), `fhir_version`, `model_namespace`,
+  `valid`.
+- `validation_report` — `patient_id` (PK), `bundle_id`, `report_json`.
+
+`patient_id` as primary key guarantees exactly one current Bundle and one
+current report per patient. The engine is created explicitly and tables are
+created by `init_db`; nothing touches a database at import time. All access
+goes through `BundleRepository` (`upsert_bundle_and_report`,
+`get_bundle_by_patient_id`, `list_bundle_metadata`, `count_bundles`).
+
+### Idempotent upsert behavior
+
+`upsert_bundle_and_report` compares the incoming Bundle hash to the stored row:
+absent → insert (`inserted`); same hash → reuse (`unchanged`); different hash →
+replace the Bundle and its report (`updated`). Writes run in a transaction and
+roll back cleanly on failure (raising `StorageError`). Ingestion duplicates,
+rejections, and identity conflicts are never written to these tables.
+
+### Pipeline
+
+`app.fhir.pipeline.run_fhir_pipeline` consumes the ingestion `PipelineResult`
+(never mutating it), groups accepted records by patient, and maps, validates,
+persists, and optionally exports one Bundle per patient. If one patient fails
+to map or validate, the others still process; the failure is recorded in the
+aggregate `FHIRPipelineReport`. The `app.fhir.cli` entry point wires ingestion
+to this pipeline and returns distinct exit codes for success, invalid Bundles,
+and unrecoverable failures.
 
 ## FHIR R4/R4B compatibility decision
 
@@ -218,8 +313,32 @@ Decision:
 - Isolate this decision inside the `fhir` module: no other module imports
   `fhir.resources` directly, so a future namespace change touches one module.
 
-FHIR mapping is not implemented in the current scaffold; this section records
-the decision ahead of implementation.
+### Limits of the R4 compatibility guard
+
+The guard in `app.fhir.compatibility` maintains an explicit allowlist of the
+resource types and fields this project emits (Patient, Encounter,
+DocumentReference, DiagnosticReport, Bundle, and the nested structures they
+use). It rejects any emitted field outside that allowlist — including
+R4B-only fields — any unsupported `resourceType`, and any profile or extension
+the mapper should never produce.
+
+Its scope is deliberately narrow. It validates **only this project's output
+shape**; it does not implement FHIR cardinality rules, value-set binding,
+invariants, terminology validation, or the full specification. It is a
+guardrail against accidental drift out of the R4-compatible field subset, not
+a conformance validator. R4B model validation through `fhir.resources` is not,
+by itself, exact official R4 conformance validation. The project does not
+claim the official HL7 FHIR Validator was run; exported Bundles can be checked
+against it optionally (see `README.md`).
+
+### FHIR handoff to future summarization and search phases
+
+The stored Bundles and the canonical `ClinicalRecord` text are the inputs to
+the planned summarization and search phases: summaries will be generated from
+resource text and cached in SQLite, and document text plus summaries will be
+embedded into ChromaDB. Deterministic resource IDs and Bundle hashes give
+those phases stable keys to attach summaries and embeddings to, and to detect
+when a Bundle has changed and its derived artifacts must be recomputed.
 
 ## Testing strategy
 

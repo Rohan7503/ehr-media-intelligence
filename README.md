@@ -13,9 +13,10 @@ explorable through AI-generated clinical summaries and semantic search.
 
 ## Status
 
-**Ingestion phase complete.** The repository structure, backend API skeleton
-(`GET /health`), frontend application shell, tooling, CI, and the full
-ingestion and cleaning pipeline are in place. FHIR mapping, summarization,
+**Ingestion and FHIR normalization complete.** The repository structure,
+backend API skeleton (`GET /health`), frontend application shell, tooling, CI,
+the ingestion and cleaning pipeline, and FHIR R4-compatible mapping with
+Bundle validation and SQLite persistence are in place. Summarization,
 embeddings, and search are documented in
 [docs/product-requirements.md](docs/product-requirements.md) but not yet
 implemented.
@@ -116,6 +117,94 @@ git-ignored):
   conflicts — never merged by name similarity.
 - Invalid individual records are rejected with reasons and never abort the
   run; genuinely ambiguous dates are flagged rather than guessed.
+
+## FHIR normalization
+
+Accepted canonical patients and records are mapped to FHIR R4-compatible
+resources and grouped into one Bundle per patient.
+
+**Resource mappings:**
+
+| Canonical                     | FHIR resource        | Notes                                             |
+| ----------------------------- | -------------------- | ------------------------------------------------- |
+| patient                       | Patient              | MRN identifier, name, gender, birthDate           |
+| record (`document`)           | DocumentReference    | clinical text as a base64 `text/plain` attachment |
+| record (`diagnostic_report`)  | DiagnosticReport     | text-only `code`, `conclusion`, `presentedForm`   |
+| canonical encounter ID        | Encounter            | one per unique ID; period derived from record dates |
+| patient + its records         | Bundle (`collection`) | Patient first, then Encounters, then clinical resources |
+
+Resource IDs and Bundle entry `fullUrl` values are deterministic UUIDv5
+identifiers, and no timestamps enter Bundle content, so mapping the same input
+produces byte-identical Bundles. Clinical text is preserved verbatim: decoding
+a DocumentReference attachment returns exactly the canonical record text. No
+medical terminology codes (LOINC, SNOMED CT, ICD) are invented; a
+source-provided diagnostic code is preserved as an Identifier in a clearly
+project-owned namespace.
+
+**Run the FHIR pipeline** (from `backend/`, virtual environment active) — this
+runs ingestion, then mapping, validation, and persistence:
+
+```bash
+python -m app.fhir.cli ../data/synthetic --output-dir ../data/generated/fhir --database-url sqlite:///../data/generated/ehr_media.db
+```
+
+Exit codes: `0` all Bundles valid, `1` one or more Bundles invalid (reports
+still written), `2` unrecoverable configuration/input/storage failure. No API
+key or network access is required.
+
+**Inspect exported Bundles.** Each patient Bundle is written to
+`bundle_<patient_id>.json` (readable, sorted keys, LF newlines) alongside an
+aggregate `fhir_report.json`. Both live under the git-ignored output directory.
+
+**Validation layers.** Every Bundle passes through three independent layers,
+recorded per patient in the report:
+
+1. `fhir.resources` model validation (library-level structural/type checks).
+2. Project reference-integrity validation (single Patient, unique IDs and
+   `fullUrl`s, resolvable local references, complete and exclusive record
+   coverage, matching resource types, valid attachment payloads, deterministic
+   ordering).
+3. A scoped **R4 compatibility guard** (see below).
+
+A Bundle is valid only when it has no `error`-severity issues; warnings stay
+visible but never mark a Bundle invalid. Broken references are reported, never
+silently repaired.
+
+**SQLite persistence.** Bundles and validation reports are stored in SQLite
+(via SQLAlchemy 2) keyed on patient ID — one current Bundle and one current
+report each. Persistence is idempotent: re-running with unchanged input reuses
+rows (`unchanged`); a changed Bundle hash replaces the stored Bundle and
+report (`updated`). Writes are transactional and roll back on failure. The
+local database path is git-ignored.
+
+### FHIR R4/R4B compatibility strategy
+
+- **Target specification:** FHIR R4 4.0.1
+- **Model library:** `fhir.resources`
+- **Model namespace:** `R4B`
+- **Compatibility strategy:** R4 field subset
+
+The installed `fhir.resources` release exposes older compatible resources
+through the `R4B` namespace. All `fhir.resources.R4B` imports are isolated
+under `backend/app/fhir/`, and the mapper emits only fields shared with FHIR
+R4 4.0.1 for the five resources used. The R4 compatibility guard enforces an
+explicit allowlist of those fields and resource types and rejects any
+R4B-only field, unexpected resource type, or profile/extension the mapper
+should never emit.
+
+This guard is **scoped to this project's output**; it is not a replacement for
+the official HL7 FHIR Validator and does not implement the full specification.
+The project does not claim official R4 conformance was tested.
+
+**Optional:** to independently check exported Bundles against the official
+validator, download the HL7 [FHIR Validator CLI](https://github.com/hapifhir/org.hl7.fhir.core/releases)
+(a Java JAR; not vendored and not required for the Python test suite) and run,
+for example:
+
+```bash
+# optional, requires Java and a separate download
+java -jar validator_cli.jar data/generated/fhir/bundle_PAT-000123.json -version 4.0.1
+```
 
 ## Frontend setup
 

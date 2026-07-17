@@ -13,14 +13,15 @@ explorable through AI-generated clinical summaries and semantic search.
 
 ## Status
 
-**Backend pipelines complete through semantic search.** The repository
-structure, backend API (`GET /health`, `POST /search`), frontend application
-shell, tooling, CI, the ingestion and cleaning pipeline, FHIR R4-compatible
+**End-to-end product complete.** The backend API (`GET /health`, `POST /search`,
+`GET /patients/{id}`), the ingestion and cleaning pipeline, FHIR R4-compatible
 mapping with Bundle validation and SQLite persistence, cached clinical
-summarization via the Anthropic API, and semantic search over FHIR resources
-and summaries (sentence-transformers + ChromaDB) are in place. The clinician
-search interface (frontend) remains under construction; see
-[docs/product-requirements.md](docs/product-requirements.md).
+summarization via the Anthropic API, semantic search over FHIR resources and
+summaries (sentence-transformers + ChromaDB), and the clinician-facing React +
+Tailwind search interface with a patient detail drawer are all in place, along
+with tooling and CI. Remaining work is incremental (authentication, real EHR
+feeds, and other items are out of scope; see
+[docs/product-requirements.md](docs/product-requirements.md)).
 
 ## Architecture
 
@@ -373,9 +374,15 @@ PY
 The target is under two seconds for at least 50 clinical records; warm searches
 over the 58-record dataset run in tens of milliseconds.
 
-## Frontend setup
+## Frontend — clinician search interface
 
-Requires Node.js 22+.
+A React + TypeScript + Tailwind CSS single page that talks to the backend with
+the native Fetch API (no Axios, no global state library).
+
+**Prerequisites.** Run the backend and build the Chroma index first (above), so
+`POST /search` and `GET /patients/{id}` return data.
+
+**Run it** (requires Node.js 22+):
 
 ```bash
 cd frontend
@@ -383,7 +390,46 @@ npm install
 npm run dev
 ```
 
-The application shell serves at http://localhost:5173.
+The app serves at http://localhost:5173.
+
+**`VITE_API_BASE_URL`.** The backend base URL is read from this build-time
+variable (see `.env.example`); it defaults to `http://127.0.0.1:8000`. Point it
+at your backend if it runs elsewhere, e.g.:
+
+```bash
+VITE_API_BASE_URL=http://127.0.0.1:8000 npm run dev
+```
+
+**Search and filters.** Enter a natural-language query and press Enter or the
+Search button. Filter by resource type (all / DocumentReference /
+DiagnosticReport) and by a from/to date range; **Clear filters** resets them.
+Filters are preserved across searches, empty queries are not submitted, and
+duplicate submissions are blocked while a search is in flight. Backend
+validation and service errors are shown as readable messages, never raw
+responses. Results are the top five ranked resource cards, each showing the
+patient, MRN, record date (or “Date unavailable”), a resource-type badge, the
+relevance as a percentage, the title, a text snippet, and a cached-summary
+snippet when one exists.
+
+**Patient detail.** Selecting a result card (click, Enter, or Space) opens a
+patient detail panel — a right-side drawer on desktop, a full-screen panel on
+small screens. It shows demographics, the Bundle validation status, the full
+cached clinical summary with a confidence indicator and the fixed AI disclaimer
+(or a clear message when no summary is cached — **summaries appear only when
+they have already been generated**), and the linked FHIR resources as readable
+text (long text collapses with a Show more / Show less toggle). Raw FHIR JSON and
+base64 are never displayed.
+
+**Accessibility.** Every control has a visible or ARIA label; result cards are
+keyboard operable with visible focus rings; search status is announced through a
+polite live region; the drawer uses `role="dialog"` with `aria-modal`, traps
+focus, closes on Escape or backdrop click, restores focus to the originating
+card, and locks background scroll; meaning never relies on color alone; and
+animations respect `prefers-reduced-motion`.
+
+**States.** The interface has explicit initial, loading, results, no-results, and
+error states for search, and loading, not-found, error, and summary-unavailable
+states for patient detail.
 
 ## Quality commands
 

@@ -423,6 +423,36 @@ model or opens Chroma at import time.
   errors map to `422`, an unavailable index to `503`; no stack traces or
   filesystem paths are exposed. `/health` is unchanged.
 
+## Clinician interface
+
+### Patient detail endpoint
+
+`GET /patients/{patient_id}` (`app/api/patients.py`) backs the frontend's
+patient detail view. It reads the stored valid FHIR Bundle and the matching
+cached summary (via a request-scoped `Session` provided by dependency
+injection, consistent with the search API), and returns demographics, Bundle
+validation status, the full cached `ClinicalSummary` (or `null`), its confidence
+and disclaimer, and the linked clinical resources as readable text (reusing the
+summarization evidence extractor, so no raw base64 is returned). Unknown or
+non-valid patients return `404`; the summarization provider is never invoked and
+no internal paths or stack traces are exposed. It is intentionally the only
+patient endpoint.
+
+### Frontend
+
+A React + TypeScript + Tailwind CSS single page (`frontend/src/`) using the
+native Fetch API, no Axios, and no global state library. A small typed client
+(`api/client.ts`, base URL from `VITE_API_BASE_URL`) wraps `POST /search` and
+`GET /patients/{id}`, encodes query parameters, extracts readable messages from
+both FastAPI error shapes, and supports `AbortSignal` cancellation. Components
+are focused: `SearchBar`, `SearchFilters`, `SearchResultCard`,
+`PatientDetailDrawer`, `StateMessage`, and shared badges. `App.tsx` owns search
+state and the explicit initial/loading/results/empty/error states; the drawer
+owns its own fetch and loading/not-found/error/summary-unavailable states, dialog
+semantics, focus trap and restoration, Escape/backdrop close, and background
+scroll lock. The drawer is keyed by patient ID so it remounts cleanly per
+selection.
+
 ## Testing strategy
 
 - **Framework**: pytest for the backend; FastAPI's `TestClient` (HTTPX) for

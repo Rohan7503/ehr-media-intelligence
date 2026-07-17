@@ -98,12 +98,22 @@ when available. The embedding model (`EMBEDDING_MODEL`, default
 `all-MiniLM-L6-v2`) and Chroma collection (`CHROMA_COLLECTION`, `CHROMA_PATH`)
 are configurable and loaded lazily, reused across requests.
 
-### 7. Clinician-facing interface — planned
+### 7. Clinician-facing interface — implemented
 
 - Provide a React + Tailwind CSS web interface for clinicians to search and
   review documents and summaries.
 - Communicate clearly that all data is synthetic and the tool is not for
   clinical decision-making.
+
+Delivered as a React + TypeScript + Tailwind single page (native Fetch API):
+natural-language search with resource-type and date filters, ranked result
+cards, and an accessible patient detail drawer showing demographics, the cached
+clinical summary (when available) with confidence and disclaimer, and linked
+FHIR resources as readable text. Explicit loading/empty/error/not-found states,
+full keyboard operability and dialog semantics, and the synthetic-data,
+non-clinical-use disclaimer in the footer. Backed by a new
+`GET /patients/{patient_id}` endpoint; summaries are shown only when already
+cached.
 
 ## Non-functional requirements
 

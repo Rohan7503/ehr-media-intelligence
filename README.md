@@ -45,6 +45,62 @@ decision.
 | Frontend  | React, TypeScript, Vite, Tailwind CSS, native Fetch API           |
 | Quality   | Ruff, mypy, pytest, ESLint, tsc, GitHub Actions                   |
 
+## Quickstart (fresh clone)
+
+End-to-end from a fresh clone. Steps 5 and 6 write to the git-ignored
+`data/generated/`. Summary generation (step 7) is optional and the only step
+that needs an API key; every other step, and the whole UI, works without one.
+Each step links to its detailed section below.
+
+```bash
+# 1. Environment variables (optional; sensible defaults otherwise)
+cp .env.example .env          # then edit if needed; never commit .env
+
+# 2. Backend deps (from backend/)
+cd backend
+python -m venv .venv
+# Windows: .venv\Scripts\activate   macOS/Linux: source .venv/bin/activate
+pip install -e ".[dev]"
+
+# 3. (Optional) regenerate the synthetic dataset — deterministic; already checked in
+python ../scripts/generate_synthetic_data.py
+
+# 4. Ingest + clean the synthetic records
+python -m app.ingestion.cli ../data/synthetic --output-dir ../data/generated
+
+# 5. Map to FHIR Bundles and persist to SQLite
+python -m app.fhir.cli ../data/synthetic \
+    --output-dir ../data/generated/fhir \
+    --database-url sqlite:///../data/generated/ehr_media.db
+
+# 6. (Optional) generate cached clinical summaries — needs ANTHROPIC_API_KEY
+python -m app.summarization.cli \
+    --database-url sqlite:///../data/generated/ehr_media.db \
+    --output-dir ../data/generated/summaries
+
+# 7. Build the semantic-search index (downloads the embedding model once)
+python -m app.search.cli \
+    --database-url sqlite:///../data/generated/ehr_media.db \
+    --chroma-path ../data/generated/chroma
+
+# 8. Run the API (point it at the generated DB and index)
+DATABASE_URL=sqlite:///../data/generated/ehr_media.db \
+CHROMA_PATH=../data/generated/chroma \
+uvicorn app.main:app --reload
+
+# 9. Run the frontend (in another terminal, from frontend/)
+cd ../frontend && npm install && npm run dev
+```
+
+Then open http://localhost:5173 and search. Detailed sections:
+[Backend setup](#backend-setup), [Ingestion pipeline](#ingestion-pipeline),
+[FHIR normalization](#fhir-normalization),
+[Clinical summarization](#clinical-summarization),
+[Semantic search](#semantic-search),
+[Frontend](#frontend--clinician-search-interface). Offline validation results
+are in [docs/validation.md](docs/validation.md); the design write-up is in
+[docs/write-up.md](docs/write-up.md).
+
 ## Backend setup
 
 Requires Python 3.11.
@@ -57,11 +113,25 @@ pip install -e ".[dev]"
 uvicorn app.main:app --reload
 ```
 
-The API serves `GET /health` at http://127.0.0.1:8000/health.
+The API serves `GET /health` at http://127.0.0.1:8000/health, `POST /search`,
+and `GET /patients/{patient_id}`.
 
 Configuration is read from environment variables (or a local `.env` file).
-Copy `.env.example` to `.env` and adjust as needed; no variables are required
-to run the scaffold.
+Copy `.env.example` to `.env` and adjust as needed. No variables are required to
+run the API; only clinical-summary generation needs `ANTHROPIC_API_KEY`.
+
+### Environment variables
+
+| Variable | Purpose | Default |
+| --- | --- | --- |
+| `ANTHROPIC_API_KEY` | Auth for clinical-summary generation (optional; cached summaries need no key) | empty |
+| `ANTHROPIC_MODEL` | Model for summarization | `claude-sonnet-5` |
+| `DATABASE_URL` | SQLAlchemy URL for the SQLite database | `sqlite:///./data/ehr.sqlite3` |
+| `CHROMA_PATH` | ChromaDB persistence directory | `./data/chroma` |
+| `CHROMA_COLLECTION` | Chroma collection name | `ehr_media` |
+| `EMBEDDING_MODEL` | sentence-transformers model | `all-MiniLM-L6-v2` |
+| `CORS_ORIGINS` | Comma-separated allowed origins | `http://localhost:5173` |
+| `VITE_API_BASE_URL` | Frontend: backend base URL (build-time) | `http://127.0.0.1:8000` |
 
 ## Ingestion pipeline
 
@@ -458,7 +528,24 @@ All of these run in CI on every push and pull request.
 backend/            FastAPI application and tests
 frontend/           React + TypeScript + Vite + Tailwind interface
 data/synthetic/     synthetic EHR fixtures (never real data)
-docs/               product requirements and architecture
+docs/               product requirements, architecture, validation, write-up
 scripts/            development and data-generation utilities
 .github/workflows/  CI pipelines
 ```
+
+## Limitations and disclaimers
+
+- **Synthetic data only.** Every name, identifier, date, and clinical detail is
+  fabricated. The project has never touched real patient records.
+- **Not for clinical use.** Summaries and search results are assistive artifacts
+  of a demonstration project and must not inform clinical decisions.
+- **Summaries require caching.** Clinical summaries appear in the UI and index
+  only after they have been generated and cached; generation needs an
+  `ANTHROPIC_API_KEY`. Offline validation used a fake provider and made no live
+  API calls (see [docs/validation.md](docs/validation.md)).
+- **Scope.** Authentication, real EHR integrations (HL7 v2, live FHIR servers),
+  and clinical decision support are out of scope; see
+  [docs/product-requirements.md](docs/product-requirements.md).
+- **FHIR conformance.** Resources use `fhir.resources` R4B models restricted to
+  an R4-compatible field subset and are checked by a scoped project guard; this
+  is not a substitute for the official HL7 FHIR Validator.
